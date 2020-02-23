@@ -1,3 +1,6 @@
+
+import numpy as np
+
 def grad_U(Ui, Yij, Vj, reg, eta):
     """
     Takes as input Ui (the ith row of U), a training point Yij, the column
