@@ -67,9 +67,16 @@ def get_err(U, V, Y, mu, a, b, reg=0.0):
     Returns the mean regularized squared-error of predictions made by
     estimating Y_{ij} as the dot product of the ith row of U and the jth column of V^T.
     """
-    print(mu.shape)
+    print((Y[:,2].shape-mu).shape)
     print((U@V.T).shape)
-    return reg*0.5*(np.linalg.norm(U)**2 + np.linalg.norm(V)**2 + np.linalg.norm(a)**2 + np.linalg.norm(b)**2) + 0.5*np.mean((Y[:,2] - (mu+U@V.T+a+b.T)[Y[:,0]-1,Y[:,1]-1])**2)
+    print(((U@V.T)[Y[:,0]-1,Y[:,1]-1]).shape)
+    print(Y[:,0]-1,Y[:,1]-1)
+    print(a.shape)
+    print(a[Y[:,0]-1].shape)
+    print(b.shape)
+    print(b[Y[:,1]-1].shape)
+    print(((U@V.T)[Y[:,0]-1,Y[:,1]-1]+a[Y[:,0]-1]+b[Y[:,1]-1]).shape)
+    return reg*0.5*(np.linalg.norm(U)**2 + np.linalg.norm(V)**2 + np.linalg.norm(a)**2 + np.linalg.norm(b)**2) + 0.5*np.mean((Y[:,2]-mu) - ((U@V.T)[Y[:,0]-1,Y[:,1]-1]+a[Y[:,0]-1]+b[Y[:,1]-1])**2)
 
 def train_model(M, N, K, eta, reg, Y, eps=0.0001, max_epochs=300):
     """
@@ -86,39 +93,39 @@ def train_model(M, N, K, eta, reg, Y, eps=0.0001, max_epochs=300):
     Returns a tuple (U, V, err) consisting of U, V, and the unregularized MSE
     of the model.
     """
-    U = np.random.rand(M,K) - .5
-    V = np.random.rand(N,K) - .5
-    a = np.random.rand(M,1) - .5
-    b = np.random.rand(N,1) - .5
+    print(M, N, K)
+    U = np.random.uniform(-0.5,0.5,(M,K))
+    V = np.random.uniform(-0.5,0.5,(N,K))
+    a = np.random.uniform(-0.5,0.5,(M,1))
+    b = np.random.uniform(-0.5,0.5,(N,1))
     mu = np.mean(Y)
     
-    init_err = get_err(U, V, Y, mu, a, b, reg)
-    print(init_err)
+    prev_err = np.Inf
+    err = get_err(U, V, Y, mu, a, b, reg)
+    baseline_improvement = -1
+    for epoch in range(max_epochs):
+        # Save the previous error
+        prev_err = err
+        # Iterate over Y in a random order
+        shuffle = np.random.permutation(Y.shape[0])
+        for ind in shuffle:
+            i = Y[ind,0]-1
+            j = Y[ind,1]-1
+            Y_ij = Y[ind,2]
+            # Update U and V
+            U[i,:] -= grad_U(U[i,:],Y_ij,V[j,:],a[i,:],b[j,:],reg,eta)
+            V[j,:] -= grad_V(V[j,:],Y_ij,U[i,:],a[i,:],b[j,:],reg,eta)
+            a[i,:] -= grad_U(a[i,:],Y_ij,U[i,:],V[j,:],b[j,:],reg,eta)
+            b[j,:] -= grad_V(b[j,:],Y_ij,U[i,:],V[j,:],a[i,:],reg,eta)
+        # Get the current error
+        err = get_err(U, V, Y, mu, a, b, reg)
+        # Check if the error is less than the tolerance
+        if baseline_improvement == -1 :
+            baseline_improvement = prev_err-err
+        if (prev_err-err)/baseline_improvement <= eps :
+            break
     
-    for e in range(max_epochs):
-        print(e)
-        for idx in np.random.permutation(range(len(Y))):
-            i = Y[idx, 0] - 1
-            j = Y[idx, 1] - 1
-            Y_ij = Y[idx, 2]
-            U[i] = U[i] - grad_U(U[i], Y_ij, V[j], mu, a[i], b[j], reg, eta)
-            V[j] = V[j] - grad_V(V[j], Y_ij, U[i], mu, a[i], b[j], reg, eta)
-            a[i] = a[i] - grad_a(a[i], Y_ij, U[i], V[j], mu, b[j], reg, eta)
-            b[j] = b[j] - grad_b(b[j], Y_ij, U[i], V[j], mu, a[i], reg, eta)
-        
-        if e == 0:
-            first_err = get_err(U, V, Y, mu, a, b, reg)
-            prev_err = first_err
-        elif e > 0:
-            
-            err = get_err(U, V, Y, mu, a, b, reg)
-            if (err-prev_err) / (first_err-init_err) <= eps:
-                break
-            print(err)
-            prev_err = err
-        
-    err = get_err(U, V, Y, mu, a, b)
-    return (U, V, err)
+    return (U, V, get_err(U, V, Y, mu, a, b))
 
 def apply_model(U,V):
     pass
