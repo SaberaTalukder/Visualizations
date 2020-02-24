@@ -1,6 +1,8 @@
 
 import numpy as np
 from numpy import linalg as LA
+import matplotlib.pyplot as plt
+
 
 def grad_U(Ui, Yij, Vj, mu, ai, bj, reg, eta):
     """
@@ -36,10 +38,6 @@ def grad_a(ai, Yij, Ui, Vj, mu, bj, reg, eta):
     Returns the gradient of the regularized loss function with
     respect to ai multiplied by eta.
     """
-    print('Ui')
-    print(Ui)
-    print('Vj')
-    print(Vj)
     return eta*(reg*ai + (Yij-mu-Ui@Vj-ai-bj) * -1)
 
 def grad_b(bj, Yij, Ui, Vj, mu, ai, reg, eta):
@@ -52,10 +50,6 @@ def grad_b(bj, Yij, Ui, Vj, mu, ai, reg, eta):
     Returns the gradient of the regularized loss function with
     respect to bj multiplied by eta.
     """
-    print('Ui')
-    print(Ui)
-    print('Vj')
-    print(Vj)
     return eta*(reg*bj + (Yij-mu-Ui@Vj-ai-bj) * -1)
 
 def get_err(U, V, Y, mu, a, b, reg=0.0):
@@ -67,16 +61,17 @@ def get_err(U, V, Y, mu, a, b, reg=0.0):
     Returns the mean regularized squared-error of predictions made by
     estimating Y_{ij} as the dot product of the ith row of U and the jth column of V^T.
     """
-    print((Y[:,2].shape-mu).shape)
-    print((U@V.T).shape)
-    print(((U@V.T)[Y[:,0]-1,Y[:,1]-1]).shape)
-    print(Y[:,0]-1,Y[:,1]-1)
-    print(a.shape)
-    print(a[Y[:,0]-1].shape)
-    print(b.shape)
-    print(b[Y[:,1]-1].shape)
-    print(((U@V.T)[Y[:,0]-1,Y[:,1]-1]+a[Y[:,0]-1]+b[Y[:,1]-1]).shape)
-    return reg*0.5*(np.linalg.norm(U)**2 + np.linalg.norm(V)**2 + np.linalg.norm(a)**2 + np.linalg.norm(b)**2) + 0.5*np.mean((Y[:,2]-mu) - ((U@V.T)[Y[:,0]-1,Y[:,1]-1]+a[Y[:,0]-1]+b[Y[:,1]-1])**2)
+    result = []
+    for Y_row in Y:
+        i = Y_row[0] - 1
+        j = Y_row[1] - 1
+        Y_ij = Y_row[2]
+#         print("calculating error")
+#         print(reg/2 * (LA.norm(U)**2 + LA.norm(V)**2 + LA.norm(a)**2 + LA.norm(b)**2) + 1/2 * ((Y_ij-mu) - (np.dot(U[i].T, V[j])+a[i]+b[j]))**2)
+        result.append(reg/2 * (LA.norm(U)**2 + LA.norm(V)**2 + LA.norm(a)**2 + LA.norm(b)**2) + 1/2 * ((Y_ij-mu) - (np.dot(U[i].T, V[j])+a[i]+b[j]))**2)
+    return np.mean(result)
+
+#     return reg*0.5*(np.linalg.norm(U)**2 + np.linalg.norm(V)**2 + np.linalg.norm(a)**2 + np.linalg.norm(b)**2) + 0.5*np.mean((Y[:,2]-mu) - ((U@V.T)[Y[:,0]-1,Y[:,1]-1]+a[Y[:,0]-1]+b[Y[:,1]-1])**2)
 
 def train_model(M, N, K, eta, reg, Y, eps=0.0001, max_epochs=300):
     """
@@ -102,8 +97,18 @@ def train_model(M, N, K, eta, reg, Y, eps=0.0001, max_epochs=300):
     
     prev_err = np.Inf
     err = get_err(U, V, Y, mu, a, b, reg)
+    print(err)
+    err_list = [err]
     baseline_improvement = -1
     for epoch in range(max_epochs):
+        if epoch % 10 == 0:
+            # Plot values of E_out across k for each value of lambda
+            plt.plot(range(len(err_list)), err_list)
+            plt.title('$Error$ vs. Epoch')
+            plt.xlabel('Epoch')
+            plt.ylabel('Error')
+            plt.show()
+        print(epoch)
         # Save the previous error
         prev_err = err
         # Iterate over Y in a random order
@@ -113,19 +118,21 @@ def train_model(M, N, K, eta, reg, Y, eps=0.0001, max_epochs=300):
             j = Y[ind,1]-1
             Y_ij = Y[ind,2]
             # Update U and V
-            U[i,:] -= grad_U(U[i,:],Y_ij,V[j,:],a[i,:],b[j,:],reg,eta)
-            V[j,:] -= grad_V(V[j,:],Y_ij,U[i,:],a[i,:],b[j,:],reg,eta)
-            a[i,:] -= grad_U(a[i,:],Y_ij,U[i,:],V[j,:],b[j,:],reg,eta)
-            b[j,:] -= grad_V(b[j,:],Y_ij,U[i,:],V[j,:],a[i,:],reg,eta)
+            U[i,:] -= grad_U(U[i,:],Y_ij,V[j,:],mu,a[i,:],b[j,:],reg,eta)
+            V[j,:] -= grad_V(V[j,:],Y_ij,U[i,:],mu,a[i,:],b[j,:],reg,eta)
+            a[i,:] -= grad_a(a[i,:],Y_ij,U[i,:],V[j,:],mu,b[j,:],reg,eta)
+            b[j,:] -= grad_b(b[j,:],Y_ij,U[i,:],V[j,:],mu,a[i,:],reg,eta)
         # Get the current error
         err = get_err(U, V, Y, mu, a, b, reg)
+        print(err)
+        err_list.append(err)
         # Check if the error is less than the tolerance
         if baseline_improvement == -1 :
             baseline_improvement = prev_err-err
         if (prev_err-err)/baseline_improvement <= eps :
             break
     
-    return (U, V, get_err(U, V, Y, mu, a, b))
+    return (U, V, get_err(U, V, Y, mu, a, b), err_list)
 
 def apply_model(U,V):
     pass
