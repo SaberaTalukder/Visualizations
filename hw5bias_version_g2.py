@@ -4,8 +4,9 @@ import numpy as np
 def grad_U(Ui, Yij, Vj, ai, bj, mu, reg, eta):
     """
     Takes as input Ui (the ith row of U), a training point Yij, the column
-    vector Vj (jth column of V^T), reg (the regularization parameter lambda),
-    and eta (the learning rate).
+    vector Vj (jth column of V^T), mu (the avg of all observations in Y), 
+    ai (bias term for user), bj (bias term for movie),
+    reg (the regularization parameter lambda), and eta (the learning rate).
 
     Returns the gradient of the regularized loss function with
     respect to Ui multiplied by eta.
@@ -15,8 +16,9 @@ def grad_U(Ui, Yij, Vj, ai, bj, mu, reg, eta):
 def grad_V(Vj, Yij, Ui, ai, bj, mu, reg, eta):
     """
     Takes as input the column vector Vj (jth column of V^T), a training point Yij,
-    Ui (the ith row of U), reg (the regularization parameter lambda),
-    and eta (the learning rate).
+    Ui (the ith row of U), mu (the avg of all observations in Y), 
+    ai (bias term for user), bj (bias term for movie),
+    reg (the regularization parameter lambda), and eta (the learning rate).
 
     Returns the gradient of the regularized loss function with
     respect to Vj multiplied by eta.
@@ -26,11 +28,25 @@ def grad_V(Vj, Yij, Ui, ai, bj, mu, reg, eta):
 
 def grad_a(Ui, Yij, Vj, ai, bj, mu, reg, eta):
     """
+    Takes as input Ui (the ith row of U), a training point Yij, the column
+    vector Vj (jth column of V^T), mu (the avg of all observations in Y), 
+    ai (bias term for user), bj (bias term for movie),
+    reg (the regularization parameter lambda), and eta (the learning rate).
+
+    Returns the gradient of the regularized loss function with
+    respect to ai multiplied by eta.
     """
     return eta*(reg*ai - (Yij-(Ui@Vj+ai+bj+mu)))
 
 def grad_b(Vj, Yij, Ui, ai, bj, mu, reg, eta):
     """
+    Takes as input the column vector Vj (jth column of V^T), a training point Yij,
+    Ui (the ith row of U), mu (the avg of all observations in Y), 
+    ai (bias term for user), bj (bias term for movie),
+    reg (the regularization parameter lambda), and eta (the learning rate).
+
+    Returns the gradient of the regularized loss function with
+    respect to bj multiplied by eta.
     """
     return eta*(reg*bj - (Yij-(Ui@Vj+ai+bj+mu)))
 
@@ -38,13 +54,13 @@ def grad_b(Vj, Yij, Ui, ai, bj, mu, reg, eta):
 def get_err(U, V, Y, a, b, mu, reg=0.0):
     """
     Takes as input a matrix Y of triples (i, j, Y_ij) where i is the index of a user,
-    j is the index of a movie, and Y_ij is user i's rating of movie j and
-    user/movie matrices U and V.
+    j is the index of a movie, and Y_ij is user i's rating of movie j
+    user/movie matrices U and V, user/movie biases a and b, and the global bias mu.
 
     Returns the mean regularized squared-error of predictions made by
-    estimating Y_{ij} as the dot product of the ith row of U and the jth column of V^T.
+    estimating Y_{ij} as the dot product of the ith row of U and the jth column of V^T 
+    plus the corresponding bias terms.
     """
-    #print( 0.5*np.mean((Y[:,2] - (U@V.T + np.squeeze(a[:,np.newaxis] + b)+mu )[Y[:,0]-1,Y[:,1]-1])**2))
     return reg*0.5*(np.linalg.norm(U)**2 + np.linalg.norm(V)**2 +  np.linalg.norm(a)**2 + np.linalg.norm(b)**2 ) \
             + 0.5*np.mean((Y[:,2] - (U@V.T + np.squeeze(a[:,np.newaxis] + b)+mu )[Y[:,0]-1,Y[:,1]-1])**2)
     return reg*0.5*(np.linalg.norm(U)**2 + np.linalg.norm(V)**2) + 0.5*np.mean((Y[:,2] - (U@V.T)[Y[:,0]-1,Y[:,1]-1])**2)
@@ -55,15 +71,16 @@ def train_model(M, N, K, eta, reg, Y, eps=0.0001, max_epochs=300):
     """
     Given a training data matrix Y containing rows (i, j, Y_ij)
     where Y_ij is user i's rating on movie j, learns an
-    M x K matrix U and N x K matrix V such that rating Y_ij is approximated
-    by (UV^T)_ij.
+    M x K matrix U and N x K matrix V, an Mx1 vector a, an Nx1 vector b, and 
+    a scalar mu such that rating Y_ij is approximated
+    by mu + a_i + b_j + (UV^T+outer)_ij.
 
     Uses a learning rate of <eta> and regularization of <reg>. Stops after
     <max_epochs> epochs, or once the magnitude of the decrease in regularized
     MSE between epochs is smaller than a fraction <eps> of the decrease in
     MSE after the first epoch.
 
-    Returns a tuple (U, V, err) consisting of U, V, and the unregularized MSE
+    Returns a tuple (U, V, a, b, mu, err) consisting of U, V, and the unregularized MSE
     of the model.
     """
     U = np.random.uniform(-0.5,0.5,(M,K))
@@ -71,8 +88,6 @@ def train_model(M, N, K, eta, reg, Y, eps=0.0001, max_epochs=300):
 
     a = np.random.uniform(-0.5,0.5,(M,1))
     b = np.random.uniform(-0.5,0.5,(N,1))
-    print(np.mean(Y))
-    print(np.mean(Y[:,2]))
 
     mu = np.mean(Y[:,2])
 
