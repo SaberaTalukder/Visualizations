@@ -11,9 +11,8 @@ def get_err(model, Y):
     Returns the mean regularized squared-error of predictions made by
     estimating Y_{ij} as the dot product of the ith row of U and the jth column of V^T.
     """
-    results = np.array(list(map(lambda y : y.est, model.test(Y)))[0])
+    results = np.array(list(map(lambda i : model.predict(Y[i,0], Y[i,1]).est, np.arange(Y.shape[0]))))
     return 0.5*np.mean((Y[:,2] - results)**2)
-    #return reg*0.5*(np.linalg.norm(U)**2 + np.linalg.norm(V)**2) + 0.5*np.mean((Y[:,2] - results)**2)
 
 
 def train_model(M, N, K, eta, reg, Y, eps=0.0001, max_epochs=300):
@@ -32,13 +31,32 @@ def train_model(M, N, K, eta, reg, Y, eps=0.0001, max_epochs=300):
     of the model.
     """
     df = pd.DataFrame(Y)
+    df = df.sort_values(1)
     model = surprise.SVD()
     reader = surprise.Reader(rating_scale=(1, 5))
     data = surprise.Dataset.load_from_df(df[[0, 1, 2]], reader)
 
     trainset = data.build_full_trainset()
+    print(data.df[[1]])
+    print(np.max(data.df[[1]]))
+    print(np.min(data.df[[1]]))
+    temp = np.unique(data.df[[1]])
+    print(np.where(temp%1 == 1))
+    print(trainset.n_items)
+    print(trainset.ir.keys())
+    print(list(map(trainset.to_raw_iid, trainset.ir.keys())))
+
+    print(len(list(map(trainset.to_raw_iid, trainset.ir.keys()))))
+    temp2 = np.array(list(map(trainset.to_raw_iid, trainset.ir.keys())))
+    u, c = np.unique(temp2,return_counts=True)
+    print(c.shape)
+    print(u.shape)
+    print(np.where(c>1))
+    print(temp2.shape)
+    print(temp2)
+    print(np.setdiff1d(np.arange(1,1682), temp2, assume_unique=False))
     model.fit(trainset)
     
-    return (model, get_err(model, Y))
+    return (model,  get_err(model, Y), trainset)
 
 
